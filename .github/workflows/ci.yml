@@ -71,7 +71,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: ${{ steps.check-dir.outputs.dir }}/package-lock.json
+        continue-on-error: true
       
       - name: Install dependencies
         if: steps.check-dir.outputs.exists == 'true'
@@ -167,7 +167,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: ${{ steps.check-dir.outputs.dir }}/package-lock.json
         continue-on-error: true
       
       - name: Install Node.js dependencies
