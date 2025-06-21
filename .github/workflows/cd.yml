@@ -42,7 +42,7 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: ${{ steps.check-dir.outputs.dir }}/package-lock.json
+        continue-on-error: true
       
       - name: Install dependencies
         if: steps.check-dir.outputs.exists == 'true'
@@ -86,7 +86,7 @@ jobs:
       
       # Netlify Deployment
       - name: Deploy to Netlify
-        if: steps.check-dir.outputs.exists == 'true' && (secrets.NETLIFY_AUTH_TOKEN != '' && secrets.NETLIFY_SITE_ID != '')
+        if: steps.check-dir.outputs.exists == 'true' && secrets.NETLIFY_AUTH_TOKEN != ''
         uses: nwtgck/actions-netlify@v3.0
         with:
           publish-dir: ${{ steps.check-dir.outputs.dir }}/dist
@@ -102,7 +102,7 @@ jobs:
       
       # Vercel Deployment (Alternative)
       - name: Deploy to Vercel
-        if: steps.check-dir.outputs.exists == 'true' && (secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != '')
+        if: steps.check-dir.outputs.exists == 'true' && secrets.VERCEL_TOKEN != ''
         uses: amondnet/vercel-action@v25
         with:
           vercel-token: ${{ secrets.VERCEL_TOKEN }}
@@ -113,7 +113,7 @@ jobs:
       
       # Hostinger/FTP Deployment
       - name: Deploy to Hostinger via FTP
-        if: steps.check-dir.outputs.exists == 'true' && (secrets.FTP_HOST != '' && secrets.FTP_USERNAME != '')
+        if: steps.check-dir.outputs.exists == 'true' && secrets.FTP_HOST != ''
         uses: SamKirkland/FTP-Deploy-Action@v4.3.4
         with:
           server: ${{ secrets.FTP_HOST }}
@@ -162,7 +162,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: 'npm'
-          cache-dependency-path: ${{ steps.check-dir.outputs.dir }}/package-lock.json
         continue-on-error: true
       
       - name: Install Node.js dependencies and build
