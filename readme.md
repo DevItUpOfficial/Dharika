@@ -530,4 +530,4 @@ src/
 
 ---
 
-*This PRD serves as the technical foundation for Dharika's development. All stakeholders should review and approve before development commences.*
+
