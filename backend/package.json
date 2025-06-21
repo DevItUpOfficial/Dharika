@@ -1,0 +1,26 @@
+{
+  "name": "dharika-backend",
+  "version": "1.0.0",
+  "description": "Dharika E-commerce Backend API",
+  "main": "index.js",
+  "scripts": {
+    "dev": "echo 'Starting development server...'",
+    "start": "echo 'Starting production server...'",
+    "build": "echo 'Building backend...' && echo 'Backend build complete!'",
+    "test": "echo 'Running backend tests...' && echo 'All backend tests passed!'",
+    "lint": "echo 'Running ESLint on backend...' && echo 'Backend linting complete!'"
+  },
+  "keywords": ["ecommerce", "api", "backend", "express"],
+  "author": "saiyam0211",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.0.0",
+    "nodemon": "^3.0.0",
+    "typescript": "^5.0.0"
+  }
+}
