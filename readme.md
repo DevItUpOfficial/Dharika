@@ -204,9 +204,6 @@ We welcome contributions! Please read our [Contributing Guidelines](./CONTRIBUTI
 - **Documentation**: All guides are in the repository
 - **CI/CD Support**: Check [CI-CD-README.md](./CI-CD-README.md)
 
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
 
 ---
 
