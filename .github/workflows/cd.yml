@@ -1,0 +1,322 @@
+name: CD Pipeline
+
+on:
+  push:
+    branches: 
+      - main          # Production deployment
+      - development   # Staging deployment
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+    branches: [main, development]
+
+env:
+  NODE_VERSION: '18'
+  PYTHON_VERSION: '3.11'
+  ADMIN_USERNAME: 'saiyam0211'
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'push'
+    strategy:
+      matrix:
+        frontend-dir: [frontend, client, web]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check if frontend directory exists
+        id: check-dir
+        run: |
+          if [ -d "${{ matrix.frontend-dir }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "dir=${{ matrix.frontend-dir }}" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Setup Node.js
+        if: steps.check-dir.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ steps.check-dir.outputs.dir }}/package-lock.json
+      
+      - name: Install dependencies
+        if: steps.check-dir.outputs.exists == 'true'
+        working-directory: ${{ steps.check-dir.outputs.dir }}
+        run: |
+          if [ -f "package-lock.json" ]; then
+            npm ci
+          elif [ -f "yarn.lock" ]; then
+            yarn install --frozen-lockfile
+          elif [ -f "pnpm-lock.yaml" ]; then
+            npm install -g pnpm
+            pnpm install --frozen-lockfile
+          else
+            npm install
+          fi
+      
+      - name: Set environment variables
+        if: steps.check-dir.outputs.exists == 'true'
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_ENV
+            echo "DEPLOY_URL=${{ secrets.PRODUCTION_URL }}" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+            echo "DEPLOY_URL=${{ secrets.STAGING_URL }}" >> $GITHUB_ENV
+          fi
+      
+      - name: Build frontend
+        if: steps.check-dir.outputs.exists == 'true'
+        working-directory: ${{ steps.check-dir.outputs.dir }}
+        run: npm run build
+        env:
+          CI: true
+          NODE_ENV: ${{ env.ENVIRONMENT }}
+          REACT_APP_API_URL: ${{ env.ENVIRONMENT == 'production' && secrets.PROD_API_URL || secrets.STAGING_API_URL }}
+          NEXT_PUBLIC_API_URL: ${{ env.ENVIRONMENT == 'production' && secrets.PROD_API_URL || secrets.STAGING_API_URL }}
+          VITE_API_URL: ${{ env.ENVIRONMENT == 'production' && secrets.PROD_API_URL || secrets.STAGING_API_URL }}
+          REACT_APP_RAZORPAY_KEY: ${{ env.ENVIRONMENT == 'production' && secrets.RAZORPAY_PROD_KEY || secrets.RAZORPAY_TEST_KEY }}
+          NEXT_PUBLIC_RAZORPAY_KEY: ${{ env.ENVIRONMENT == 'production' && secrets.RAZORPAY_PROD_KEY || secrets.RAZORPAY_TEST_KEY }}
+          VITE_RAZORPAY_KEY: ${{ env.ENVIRONMENT == 'production' && secrets.RAZORPAY_PROD_KEY || secrets.RAZORPAY_TEST_KEY }}
+      
+      # Netlify Deployment
+      - name: Deploy to Netlify
+        if: steps.check-dir.outputs.exists == 'true' && (secrets.NETLIFY_AUTH_TOKEN != '' && secrets.NETLIFY_SITE_ID != '')
+        uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: ${{ steps.check-dir.outputs.dir }}/dist
+          production-branch: main
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions - ${{ github.event.head_commit.message }}"
+          enable-pull-request-comment: false
+          enable-commit-comment: true
+          overwrites-pull-request-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ env.ENVIRONMENT == 'production' && secrets.NETLIFY_SITE_ID || secrets.NETLIFY_STAGING_SITE_ID }}
+      
+      # Vercel Deployment (Alternative)
+      - name: Deploy to Vercel
+        if: steps.check-dir.outputs.exists == 'true' && (secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != '')
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ${{ steps.check-dir.outputs.dir }}
+          vercel-args: ${{ env.ENVIRONMENT == 'production' && '--prod' || '' }}
+      
+      # Hostinger/FTP Deployment
+      - name: Deploy to Hostinger via FTP
+        if: steps.check-dir.outputs.exists == 'true' && (secrets.FTP_HOST != '' && secrets.FTP_USERNAME != '')
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          local-dir: ${{ steps.check-dir.outputs.dir }}/dist/
+          server-dir: ${{ env.ENVIRONMENT == 'production' && secrets.FTP_PROD_DIR || secrets.FTP_STAGING_DIR }}
+          exclude: |
+            **/.git*
+            **/.git*/**
+            **/node_modules/**
+            **/.env*
+
+  deploy-backend:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success' || github.event_name == 'push'
+    strategy:
+      matrix:
+        backend-dir: [backend, server, api]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Check if backend directory exists
+        id: check-dir
+        run: |
+          if [ -d "${{ matrix.backend-dir }}" ]; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "dir=${{ matrix.backend-dir }}" >> $GITHUB_OUTPUT
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+          fi
+      
+      - name: Set environment variables
+        if: steps.check-dir.outputs.exists == 'true'
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "ENVIRONMENT=production" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=staging" >> $GITHUB_ENV
+          fi
+      
+      # Node.js Backend Deployment
+      - name: Setup Node.js for Node backend
+        if: steps.check-dir.outputs.exists == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ${{ steps.check-dir.outputs.dir }}/package-lock.json
+        continue-on-error: true
+      
+      - name: Install Node.js dependencies and build
+        if: steps.check-dir.outputs.exists == 'true'
+        working-directory: ${{ steps.check-dir.outputs.dir }}
+        run: |
+          if [ -f "package.json" ]; then
+            if [ -f "package-lock.json" ]; then
+              npm ci
+            else
+              npm install
+            fi
+            npm run build --if-present
+          fi
+        continue-on-error: true
+      
+      # Python Backend Deployment
+      - name: Setup Python for Python backend
+        if: steps.check-dir.outputs.exists == 'true'
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+        continue-on-error: true
+      
+      # Heroku Deployment
+      - name: Deploy to Heroku
+        if: steps.check-dir.outputs.exists == 'true' && secrets.HEROKU_API_KEY != ''
+        uses: akhileshns/heroku-deploy@v3.12.14
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: ${{ env.ENVIRONMENT == 'production' && secrets.HEROKU_PROD_APP || secrets.HEROKU_STAGING_APP }}
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          appdir: ${{ steps.check-dir.outputs.dir }}
+          usedocker: false
+        env:
+          HD_DATABASE_URL: ${{ env.ENVIRONMENT == 'production' && secrets.PROD_DATABASE_URL || secrets.STAGING_DATABASE_URL }}
+          HD_RAZORPAY_KEY_ID: ${{ env.ENVIRONMENT == 'production' && secrets.RAZORPAY_PROD_KEY || secrets.RAZORPAY_TEST_KEY }}
+          HD_RAZORPAY_KEY_SECRET: ${{ env.ENVIRONMENT == 'production' && secrets.RAZORPAY_PROD_SECRET || secrets.RAZORPAY_TEST_SECRET }}
+          HD_JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          HD_NODE_ENV: ${{ env.ENVIRONMENT }}
+      
+      # Railway Deployment (Alternative)
+      - name: Deploy to Railway
+        if: steps.check-dir.outputs.exists == 'true' && secrets.RAILWAY_TOKEN != ''
+        uses: bervProject/railway-deploy@v1.0.7
+        with:
+          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          service: ${{ env.ENVIRONMENT == 'production' && secrets.RAILWAY_PROD_SERVICE || secrets.RAILWAY_STAGING_SERVICE }}
+          detach: true
+      
+      # DigitalOcean/VPS Deployment via SSH
+      - name: Deploy to VPS via SSH
+        if: steps.check-dir.outputs.exists == 'true' && secrets.VPS_HOST != ''
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USERNAME }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            cd ${{ env.ENVIRONMENT == 'production' && secrets.VPS_PROD_PATH || secrets.VPS_STAGING_PATH }}
+            git pull origin ${{ github.ref_name }}
+            
+            # Node.js deployment
+            if [ -f "package.json" ]; then
+              npm install --production
+              npm run build --if-present
+              pm2 restart ${{ env.ENVIRONMENT == 'production' && secrets.PM2_PROD_APP || secrets.PM2_STAGING_APP }} || pm2 start ecosystem.config.js
+            fi
+            
+            # Python deployment
+            if [ -f "requirements.txt" ]; then
+              source venv/bin/activate
+              pip install -r requirements.txt
+              
+              # Django
+              if [ -f "manage.py" ]; then
+                python manage.py collectstatic --noinput
+                python manage.py migrate
+                sudo systemctl restart ${{ env.ENVIRONMENT == 'production' && secrets.DJANGO_PROD_SERVICE || secrets.DJANGO_STAGING_SERVICE }}
+              fi
+              
+              # Flask/FastAPI
+              if [ -f "app.py" ] || [ -f "main.py" ]; then
+                sudo systemctl restart ${{ env.ENVIRONMENT == 'production' && secrets.PYTHON_PROD_SERVICE || secrets.PYTHON_STAGING_SERVICE }}
+              fi
+            fi
+
+  notify-deployment:
+    runs-on: ubuntu-latest
+    needs: [deploy-frontend, deploy-backend]
+    if: always()
+    steps:
+      - name: Notify Slack
+        if: secrets.SLACK_WEBHOOK_URL != ''
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped') && (needs.deploy-backend.result == 'success' || needs.deploy-backend.result == 'skipped') && 'success' || 'failure' }}
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          fields: repo,message,commit,author,action,eventName,ref,workflow
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+      
+      - name: Notify via Email
+        if: secrets.SMTP_SERVER != ''
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT || 587 }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: "Dharika Deployment ${{ (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped') && (needs.deploy-backend.result == 'success' || needs.deploy-backend.result == 'skipped') && 'Successful' || 'Failed' }}"
+          body: |
+            Deployment to ${{ github.ref == 'refs/heads/main' && 'Production' || 'Staging' }} has ${{ (needs.deploy-frontend.result == 'success' || needs.deploy-frontend.result == 'skipped') && (needs.deploy-backend.result == 'success' || needs.deploy-backend.result == 'skipped') && 'completed successfully' || 'failed' }}.
+            
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+            Message: ${{ github.event.head_commit.message }}
+            
+            Admin: @${{ env.ADMIN_USERNAME }}
+          to: ${{ secrets.NOTIFICATION_EMAIL }}
+      
+      - name: Create deployment issue on failure
+        if: failure() && github.ref == 'refs/heads/main'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `🚨 Production Deployment Failed - ${new Date().toISOString().split('T')[0]}`,
+              body: `## 🚨 Critical: Production Deployment Failure
+              
+              **Environment:** Production
+              **Branch:** ${{ github.ref_name }}
+              **Commit:** ${{ github.sha }}
+              **Actor:** ${{ github.actor }}
+              **Time:** ${new Date().toISOString()}
+              
+              ### Deployment Status
+              - Frontend: ${{ needs.deploy-frontend.result }}
+              - Backend: ${{ needs.deploy-backend.result }}
+              
+              ### Required Actions
+              - [ ] Investigate deployment failure
+              - [ ] Determine if rollback is needed
+              - [ ] Fix underlying issues
+              - [ ] Re-deploy when ready
+              
+              **Workflow Run:** [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+              
+              @${{ env.ADMIN_USERNAME }} - Immediate attention required!`,
+              labels: ['bug', 'critical', 'deployment', 'production'],
+              assignees: ['${{ env.ADMIN_USERNAME }}']
+            }) 
