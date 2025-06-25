@@ -22,6 +22,10 @@ exports.signup = async (req, res) => {
   try {
     const { email, password, firstName, lastName } = req.body;
 
+    if (!email || !password || !firstName || !lastName) {
+      return res.status(400).json({ error: "All fields are required" });
+    }
+
     const existingUser = await User.findOne({ email });
     if (existingUser)
       return res.status(409).json({ error: "Email already in use" });
@@ -48,6 +52,7 @@ exports.signup = async (req, res) => {
       .status(201)
       .json({ message: "Signup successful. Please verify your email." });
   } catch (err) {
+    console.error("Signup Error:", err);
     res.status(500).json({ error: "Signup failed" });
   }
 };
@@ -65,14 +70,18 @@ exports.verifyEmail = async (req, res) => {
     if (!user) return res.status(400).json({ error: "Invalid token" });
     res.status(200).json({ message: "Email verified successfully" });
   } catch (err) {
+    console.error("Verification Error:", err);
     res.status(400).json({ error: "Invalid or expired token" });
   }
 };
 
-//Email/Password Sign-in 
+//Email/Password Sign-in
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
+
+    if (!email || !password)
+      return res.status(400).json({ error: "Email and password are required" });
 
     const user = await User.findOne({ email });
     if (!user || user.provider !== "local")
@@ -87,6 +96,7 @@ exports.login = async (req, res) => {
     const tokens = generateTokens(user);
     res.status(200).json({ message: "Login successful", ...tokens });
   } catch (err) {
+    console.error("Login Error:", err);
     res.status(500).json({ error: "Login failed" });
   }
 };
@@ -95,6 +105,8 @@ exports.login = async (req, res) => {
 exports.googleLogin = async (req, res) => {
   try {
     const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ error: "ID token required" });
+
     const ticket = await client.verifyIdToken({
       idToken,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -119,7 +131,36 @@ exports.googleLogin = async (req, res) => {
     const tokens = generateTokens(user);
     res.status(200).json({ message: "Google login successful", ...tokens });
   } catch (err) {
-    console.error(err);
+    console.error("Google Login Error:", err);
     res.status(400).json({ error: "Google login failed" });
+  }
+};
+
+// Resend Verification Email
+exports.resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) return res.status(400).json({ error: "Email is required" });
+
+    const user = await User.findOne({ email });
+
+    if (!user) return res.status(404).json({ error: "User not found" });
+
+    if (user.isVerified)
+      return res.status(400).json({ error: "Email is already verified" });
+
+    const emailToken = jwt.sign(
+      { userId: user._id },
+      process.env.EMAIL_VERIFICATION_SECRET,
+      { expiresIn: "1d" }
+    );
+
+    await sendVerificationEmail(user.email, emailToken);
+
+    res.status(200).json({ message: "Verification email resent successfully" });
+  } catch (err) {
+    console.error("Resend Verification Error:", err);
+    res.status(500).json({ error: "Could not resend verification email" });
   }
 };
