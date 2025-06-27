@@ -6,7 +6,7 @@ const { OAuth2Client } = require("google-auth-library");
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 // Generate JWT
-function generateTokens(user) {
+const generateTokens = (user) => {
   const payload = { userId: user._id, role: user.role };
   const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
     expiresIn: "15m",
@@ -15,28 +15,28 @@ function generateTokens(user) {
     expiresIn: "7d",
   });
   return { accessToken, refreshToken };
-}
+};
 
-// Email/Password Signup
-exports.signup = async (req, res) => {
+// POST /auth/signup
+const register = async (req, res) => {
   try {
-    const { email, password, firstName, lastName } = req.body;
+    const { email, phone, password, firstName, lastName } = req.body;
 
-    if (!email || !password || !firstName || !lastName) {
+    if (!email || !phone || !password || !firstName || !lastName) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    const existingUser = await User.findOne({ email });
+    const existingUser = await User.findOne({ $or: [{ email }, { phone }] });
     if (existingUser)
-      return res.status(409).json({ error: "Email already in use" });
+      return res.status(409).json({ error: "Email or phone already in use" });
 
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await User.create({
       email,
+      phone,
       passwordHash,
       firstName,
       lastName,
-      provider: "local",
       isVerified: false,
     });
 
@@ -50,15 +50,15 @@ exports.signup = async (req, res) => {
 
     res
       .status(201)
-      .json({ message: "Signup successful. Please verify your email." });
+      .json({ message: "Registration successful. Please verify your email." });
   } catch (err) {
-    console.error("Signup Error:", err);
-    res.status(500).json({ error: "Signup failed" });
+    console.error("Register Error:", err);
+    res.status(500).json({ error: "Registration failed" });
   }
 };
 
-//Email Verification
-exports.verifyEmail = async (req, res) => {
+// GET /auth/verify-email/:token
+const verifyEmail = async (req, res) => {
   try {
     const { token } = req.params;
     const { userId } = jwt.verify(token, process.env.EMAIL_VERIFICATION_SECRET);
@@ -75,13 +75,10 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
-//Email/Password Sign-in
-exports.login = async (req, res) => {
+// POST /auth/login
+const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-
-    if (!email || !password)
-      return res.status(400).json({ error: "Email and password are required" });
 
     const user = await User.findOne({ email });
     if (!user || user.provider !== "local")
@@ -101,8 +98,8 @@ exports.login = async (req, res) => {
   }
 };
 
-//Google Sign-in
-exports.googleLogin = async (req, res) => {
+// POST /auth/google-login
+const googleLogin = async (req, res) => {
   try {
     const { idToken } = req.body;
     if (!idToken) return res.status(400).json({ error: "ID token required" });
@@ -136,8 +133,8 @@ exports.googleLogin = async (req, res) => {
   }
 };
 
-// Resend Verification Email
-exports.resendVerification = async (req, res) => {
+// POST /auth/resend-verification
+const resendVerification = async (req, res) => {
   try {
     const { email } = req.body;
 
@@ -163,4 +160,85 @@ exports.resendVerification = async (req, res) => {
     console.error("Resend Verification Error:", err);
     res.status(500).json({ error: "Could not resend verification email" });
   }
+};
+
+// PUT /auth/update-profile
+const updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const { firstName, lastName, phone } = req.body;
+
+    const updated = await User.findByIdAndUpdate(
+      userId,
+      { firstName, lastName, phone },
+      { new: true }
+    );
+
+    if (!updated) return res.status(404).json({ error: "User not found" });
+
+    res.status(200).json({ message: "Profile updated", user: updated });
+  } catch (err) {
+    console.error("Update Profile Error:", err);
+    res.status(500).json({ error: "Could not update profile" });
+  }
+};
+
+// POST /auth/reset-password
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    const { userId } = jwt.verify(token, process.env.RESET_PASSWORD_SECRET);
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await User.findByIdAndUpdate(userId, { passwordHash });
+
+    res.status(200).json({ message: "Password reset successful" });
+  } catch (err) {
+    console.error("Reset Password Error:", err);
+    res.status(400).json({ error: "Invalid or expired token" });
+  }
+};
+
+const requestPasswordReset = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    const user = await User.findOne({ email });
+    if (!user) {
+      // Don't reveal user doesn't exist
+      return res
+        .status(200)
+        .json({ message: "If this email exists, a reset link was sent." });
+    }
+
+    const resetToken = jwt.sign(
+      { userId: user._id },
+      process.env.RESET_PASSWORD_SECRET,
+      { expiresIn: "15m" }
+    );
+
+    // TODO: In production, send via email
+    console.log("🔑 Reset token:", resetToken);
+
+    res.status(200).json({
+      message: "Reset link sent to email",
+      resetLink: `http://localhost:3000/api/auth/reset-password?token=${resetToken}`, // For dev
+    });
+  } catch (err) {
+    console.error("Request Reset Error:", err);
+    res.status(500).json({ error: "Could not generate reset token" });
+  }
+};
+
+// Export all functions
+module.exports = {
+  register,
+  verifyEmail,
+  login,
+  googleLogin,
+  resendVerification,
+  updateProfile,
+  requestPasswordReset,
+  resetPassword,
 };
