@@ -206,7 +206,6 @@ const requestPasswordReset = async (req, res) => {
 
     const user = await User.findOne({ email });
     if (!user) {
-      // Don't reveal user doesn't exist
       return res
         .status(200)
         .json({ message: "If this email exists, a reset link was sent." });
@@ -218,8 +217,7 @@ const requestPasswordReset = async (req, res) => {
       { expiresIn: "15m" }
     );
 
-    // TODO: In production, send via email
-    console.log("🔑 Reset token:", resetToken);
+    // console.log("🔑 Reset token:", resetToken);
 
     res.status(200).json({
       message: "Reset link sent to email",
