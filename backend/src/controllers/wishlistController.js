@@ -110,7 +110,9 @@ const addCollaborator = async (req, res) => {
     const collaborator = await wishlistCollaboratorService.addCollaborator(
       req.params.wishlistId,
       userId,
-      canEdit
+      canEdit,
+      req.user.userId,
+      req.user.role
     );
     res.status(201).json(collaborator);
   } catch (err) {
@@ -122,7 +124,7 @@ const addCollaborator = async (req, res) => {
 // DELETE /api/collaborators/:id
 const removeCollaborator = async (req, res) => {
   try {
-    await wishlistCollaboratorService.removeCollaborator(req.params.id);
+    await wishlistCollaboratorService.removeCollaborator(req.params.id, req.user.userId, req.user.role);
     res.status(204).end();
   } catch (err) {
     const status = err.message === 'Collaborator not found' ? 404 : 500;
@@ -134,7 +136,12 @@ const removeCollaborator = async (req, res) => {
 const updateCollaboratorPermissions = async (req, res) => {
   try {
     const { canEdit } = req.body;
-    const updated = await wishlistCollaboratorService.updatePermissions(req.params.id, canEdit);
+    const updated = await wishlistCollaboratorService.updatePermissions(
+      req.params.id,
+      canEdit,
+      req.user.userId,
+      req.user.role
+    );
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
