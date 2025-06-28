@@ -1,159 +1,105 @@
-const Cart = require("../models/Cart");
-const CartItem = require("../models/CartItem");
+const cartService = require('../services/cart/cartService');
 
-//Get all the items 
-exports.getCart = async (req, res) => {
-    const userId = req.userId; //user data from auth middleware after verifying token
-    const cart = await Cart.findOne({ userId });    //Finding the cart by user
-    const items = cart ? await CartItem.find({ cartId: cart._id }) : [];
-    res.json({ cart, items });
+
+// --- Cart Handlers ---
+
+// GET /api/cart/
+// Get all cart items for a user
+const getCart = async (req, res) => {
+    try {
+        const result = await cartService.getCart(req.userId);
+        res.json(result);
+    } 
+    catch (err) {
+        res.status(500).json({ message: err.message });
+    }
 };
 
 
 
 
-//Add items to cart
-exports.addToCart = async (req, res) => {
-    let  { variantId, quantity } = req.body;
-    const userId = req.userId;
-
-    //Ensuring quantity is a valid number
-    quantity = parseInt(quantity, 10);
-    if (isNaN(quantity)) {
-        return res.status(400).json({ message: "Invalid quantity" });
+// POST /api/cart/add
+// Add item to cart
+const addToCart = async (req, res) => {
+    try {
+        const result = await cartService.addToCart(req.userId, req.body.variantId, req.body.quantity);
+        res.json(result);
+    } 
+    catch (err) {
+        res.status(400).json({ message: err.message });
     }
-
-    //Find or create the user's cart
-    let cart = await Cart.findOne({ userId });
-    if (!cart) {
-        cart = await Cart.create({ userId });
-    }
-
-    let item = await CartItem.findOne({ cartId: cart._id, productVariantId: variantId });   //Check if item already exists in cart
-
-    if (item) {
-        item.quantity += quantity;  //If item exists, increase quantity
-        await item.save();
-    } else {
-        item = await CartItem.create({ cartId: cart._id, productVariantId: variantId, quantity });  //If not, create a new item
-    }
-
-    const items = await CartItem.find({ cartId: cart._id });
-    res.json({ cart, items });
 };
 
 
 
 
-
-//Updating quantity of Cart items
-exports.updateCartItem = async (req, res) => {
-    const userId = req.userId;
-    const { itemId, quantity } = req.body;
-
-    //Find the cart item
-    const item = await CartItem.findById(itemId);
-    if (!item) return res.status(404).json({ message: "Item not found" });
-    
-    //Find the cart associated with the item
-    const cart = await Cart.findById(item.cartId);
-    if (!cart) {
-        return res.status(404).json({ message: "Cart not found" });
+// PUT /api/cart/update
+// Update item quantity in cart
+const updateCartItem = async (req, res) => {
+    try {
+        const result = await cartService.updateCartItem(req.userId, req.body.itemId, req.body.quantity);
+        res.json(result);
+    } 
+    catch (err) {
+        const code = err.message === 'Item not found' || err.message === 'Cart not found' ? 404 : 403;
+        res.status(code).json({ message: err.message });
     }
-    
-    //Check if the cart belongs to the logged-in user
-    if (cart.userId.toString() !== userId) {
-        return res.status(403).json({ message: "Not authorized to modify this cart" });
-    }
-
-    item.quantity = quantity;
-    await item.save();
-
-    const items = await CartItem.find({ cartId: cart._id });
-    res.json({ cart, items });
 };
 
 
 
 
-
-
-//Removing cart items
-exports.removeCartItem = async (req, res) => {
-    const userId = req.userId;
-    const itemId = req.params.itemId;
-
-    const item = await CartItem.findById(itemId);
-    if (!item) return res.status(404).json({ message: "Item not found" });
-
-    const cart = await Cart.findById(item.cartId);
-
-    //Check if item belongs to user's cart
-    if (!cart || cart.userId.toString() !== userId) {
-        return res.status(403).json({ message: "Not authorized to remove this item" });
+// DELETE /api/cart/remove/:itemId
+// Remove item from cart
+const removeCartItem = async (req, res) => {
+    try {
+        const result = await cartService.removeCartItem(req.userId, req.params.itemId);
+        res.json(result);
+    } 
+    catch (err) {
+        const code = err.message === 'Item not found' ? 404 : 403;
+        res.status(code).json({ message: err.message });
     }
-
-    await item.deleteOne();
-
-    const items = await CartItem.find({ cartId: cart._id });
-    res.json({ cart, items });
 };
 
 
 
 
-
-
-//Clearing all Cart items for a user
-exports.clearCart = async (req, res) => {
-    const userId = req.userId;
-    const cart = await Cart.findOne({ userId });
-
-    if (!cart) {
-        return res.status(404).json({ success: false, message: "Cart not found for this user" });
+// DELETE /api/cart/clear
+// Clear all items in the cart
+const clearCart = async (req, res) => {
+    try {
+        const result = await cartService.clearCart(req.userId);
+        res.json(result);
+    } 
+    catch (err) {
+        res.status(404).json({ message: err.message });
     }
-    
-    await CartItem.deleteMany({ cartId: cart._id });
-    res.json({ success: true });
 };
 
 
 
 
-
-//Merging anonymous Cart with a existing user cart
-exports.mergeAnonymousCart = async (req, res) => {
-    const { anonymousCartId } = req.body;
-    const userId = req.userId;
-
-    const anonCart = await Cart.findById(anonymousCartId);
-    const userCart = await Cart.findOne({ userId }) || await Cart.create({ userId });
-    if (!anonCart) return res.status(404).json({ message: "Anonymous cart not found" });
-
-    //Get all items from anonymous cart
-    const anonItems = await CartItem.find({ cartId: anonCart._id });
-    for (let item of anonItems) {
-        const existing = await CartItem.findOne({
-            cartId: userCart._id,
-            productVariantId: item.productVariantId
-        });
-
-        if (existing) {
-            existing.quantity += item.quantity;     //If item already exists in user's cart, merge quantities
-            await existing.save();
-        } else {
-            await CartItem.create({                 //Otherwise, move the item to the user's cart
-            cartId: userCart._id,
-            productVariantId: item.productVariantId,
-            quantity: item.quantity
-            });
-        }
+// POST /api/cart/merge
+// Merge anonymous cart with user's cart
+const mergeAnonymousCart = async (req, res) => {
+    try {
+        const result = await cartService.mergeAnonymousCart(req.userId, req.body.anonymousCartId);
+        res.json(result);
+    } 
+    catch (err) {
+        res.status(404).json({ message: err.message });
     }
+};
 
-    //Clean up: delete anonymous cart and its items
-    await CartItem.deleteMany({ cartId: anonCart._id });
-    await Cart.findByIdAndDelete(anonCart._id);
 
-    const items = await CartItem.find({ cartId: userCart._id });
-    res.json({ cart: userCart, items });
+
+
+module.exports = {
+    getCart,
+    addToCart,
+    updateCartItem,
+    removeCartItem,
+    clearCart,
+    mergeAnonymousCart,
 };
