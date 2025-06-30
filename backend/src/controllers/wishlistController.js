@@ -9,7 +9,7 @@ const User = require('../models/User');
 // GET /api/wishlists/:userId
 const getWishlistsByUser = async (req, res) => {
   try {
-    const wishlists = await wishlistService.getByUser(req.params.userId);
+    const wishlists = await wishlistService.getByUser(req.user.userId, req.params.userId);
     res.json(wishlists);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -29,7 +29,7 @@ const createWishlist = async (req, res) => {
 // PUT /api/wishlists/:id
 const updateWishlist = async (req, res) => {
   try {
-    const updated = await wishlistService.update(req.params.id, req.body);
+    const updated = await wishlistService.update(req.params.id, req.body, req.user.userId);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -39,7 +39,7 @@ const updateWishlist = async (req, res) => {
 // DELETE /api/wishlists/:id
 const deleteWishlist = async (req, res) => {
   try {
-    await wishlistService.remove(req.params.id);
+    await wishlistService.remove(req.params.id, req.user.userId);
     res.status(204).end();
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -59,7 +59,7 @@ const shareWishlist = async (req, res) => {
 // GET /api/wishlists/shared/:token
 const getSharedWishlist = async (req, res) => {
   try {
-    const sharedData = await wishlistService.getShared(req.params.token);
+    const sharedData = await wishlistService.getShared(req.params.token, req.user?.userId);
     res.json(sharedData);
   } catch (err) {
     res.status(404).json({ error: err.message });
@@ -72,7 +72,7 @@ const getSharedWishlist = async (req, res) => {
 // GET /api/wishlists/:wishlistId/items
 const getItems = async (req, res) => {
   try {
-    const items = await wishlistItemService.getByWishlist(req.params.wishlistId);
+    const items = await wishlistItemService.getByWishlist(req.params.wishlistId, req.user.userId);
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -83,7 +83,7 @@ const getItems = async (req, res) => {
 const addItem = async (req, res) => {
   try {
     const { productId, userId } = req.body;
-    const item = await wishlistItemService.add(req.params.wishlistId, productId, userId);
+    const item = await wishlistItemService.add(req.params.wishlistId, productId, req.user.userId);
     res.status(201).json(item);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -93,7 +93,7 @@ const addItem = async (req, res) => {
 // DELETE /api/items/:itemId
 const removeItem = async (req, res) => {
   try {
-    await wishlistItemService.remove(req.params.itemId);
+    await wishlistItemService.remove(req.params.itemId, req.user.userId);
     res.status(204).end();
   } catch (err) {
     res.status(404).json({ error: err.message });

@@ -6,55 +6,63 @@ const User = require('../../models/User');
 
 const crypto = require('crypto');
 
-
-//Get all wishlists for a user
-const getByUser = async (userId) => {
-  return await Wishlist.find({ userId });
+// Get all wishlists for a user (only their own wishlists)
+const getByUser = async (requestingUserId, targetUserId) => {
+  if (String(requestingUserId) !== String(targetUserId)) {
+    throw new Error('Not authorized to access this user’s wishlists');
+  }
+  return await Wishlist.find({ userId: targetUserId });
 };
 
-//Create a new wishlist
-const create = async (userData) => {
-  const { userId, name, isCollaborative = false, isPublic = false } = userData;
-
-  // Check if user exists
+// Create a new wishlist (any logged-in user can)
+const create = async ({ userId, name, isCollaborative = false, isPublic = false }) => {
   const userExists = await User.findById(userId);
-  if (!userExists) {
-    throw new Error('User not found');
-  }
+  if (!userExists) throw new Error('User not found');
 
-  const wishlist = new Wishlist({
-    userId,
-    name,
-    isCollaborative,
-    isPublic,
-  });
-
+  const wishlist = new Wishlist({ userId, name, isCollaborative, isPublic });
   return await wishlist.save();
 };
 
-//Update an existing wishlist
-const update = async (wishlistId, updates) => {
-  return await Wishlist.findByIdAndUpdate(wishlistId, updates, { new: true });
-};
-
-//Delete a wishlist and cascade delete items + collaborators (handled by pre hook)
-const remove = async (wishlistId) => {
+// Update an existing wishlist (only owner can)
+const update = async (wishlistId, updates, userId) => {
   const wishlist = await Wishlist.findById(wishlistId);
-  if (!wishlist) {
-    throw new Error('Wishlist not found');
+  if (!wishlist) throw new Error('Wishlist not found');
+
+  if (String(wishlist.userId) !== String(userId)) {
+    throw new Error('Not authorized to update this wishlist');
   }
-  await wishlist.deleteOne(); // triggers pre hook to delete associated items and collaborators
+
+  Object.assign(wishlist, updates);
+  return await wishlist.save();
 };
 
-//Generate a share token for collaborative access
-const share = async (wishlistId) => {
+// Delete a wishlist (only owner can)
+const remove = async (wishlistId, userId) => {
+  const wishlist = await Wishlist.findById(wishlistId);
+  if (!wishlist) throw new Error('Wishlist not found');
+
+  if (String(wishlist.userId) !== String(userId)) {
+    throw new Error('Not authorized to delete this wishlist');
+  }
+
+  await wishlist.deleteOne(); // triggers pre hook to delete items and collaborators
+};
+
+// Generate a share token (only owner can)
+const share = async (wishlistId, userId) => {
   let updated;
   let attempts = 0;
   const maxRetries = 3;
 
-  // looping 3 times to ensure uniqueness of generated token
+  const wishlist = await Wishlist.findById(wishlistId);
+  if (!wishlist) throw new Error('Wishlist not found');
+
+  if (String(wishlist.userId) !== String(userId)) {
+    throw new Error('Not authorized to share this wishlist');
+  }
+
   while (!updated && attempts < maxRetries) {
-    const token = crypto.randomUUID(); //have maximum chances of uniqueness
+    const token = crypto.randomUUID();
 
     try {
       updated = await Wishlist.findByIdAndUpdate(
@@ -64,7 +72,6 @@ const share = async (wishlistId) => {
       );
     } catch (err) {
       if (err.code === 11000) {
-        // Duplicate key error, retry
         attempts++;
       } else {
         throw err;
@@ -82,20 +89,26 @@ const share = async (wishlistId) => {
   };
 };
 
-
-//Get a shared wishlist by token
-const getShared = async (token) => {
+// Get a shared wishlist by token
+const getShared = async (token, userId = null) => {
   const wishlist = await Wishlist.findOne({ shareToken: token });
-  if (!wishlist) {
-    throw new Error('Invalid or expired share token');
+  if (!wishlist) throw new Error('Invalid or expired share token');
+
+  // Check access if it's not public
+  if (!wishlist.isPublic) {
+    const isOwner = userId && String(wishlist.userId) === String(userId);
+    const isCollaborator = userId &&
+      (await WishlistCollaborator.exists({ wishlistId: wishlist._id, userId }));
+
+    if (!isOwner && !isCollaborator) {
+      throw new Error('Access denied to private shared wishlist');
+    }
   }
 
-  // Get all wishlist items with product details and who added it
   const items = await WishlistItem.find({ wishlistId: wishlist._id })
     .populate('productId')
     .populate('addedBy', 'firstName lastName email');
 
-  // Get all collaborators with user info and permissions
   const collaborators = await WishlistCollaborator.find({ wishlistId: wishlist._id })
     .populate('userId', 'firstName lastName email')
     .select('userId canEdit');
@@ -108,10 +121,10 @@ const getShared = async (token) => {
 };
 
 module.exports = {
-  getByUser,
-  create,
-  update,
-  remove,
-  share,
-  getShared,
+  getByUser,          // Only wishlist owner
+  create,             // Any logged-in user
+  update,             // Only wishlist owner
+  remove,             // Only wishlist owner
+  share,              // Only wishlist owner
+  getShared           // Public = anyone, Private = only owner/collaborators
 };
