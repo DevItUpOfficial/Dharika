@@ -121,7 +121,7 @@ const clearCart = async (userId) => {
 
 
 //Merge anonymous Cart with an existing user cart
-    const mergeAnonymousCart = async (userId, anonymousCartId) => {
+const mergeAnonymousCart = async (userId, anonymousCartId) => {
     const anonCart = await Cart.findById(anonymousCartId);
     if (!anonCart) throw new Error('Anonymous cart not found');
 
