@@ -7,7 +7,11 @@ const wishlistSchema = new mongoose.Schema({
   name: String,
   isCollaborative: Boolean,
   isPublic: Boolean,
-  shareToken: String
+  shareToken: {
+    type: String,
+    unique: true,
+    sparse: true
+  }
 }, { timestamps: true });
 
 wishlistSchema.pre('deleteOne', { document: true, query: false }, async function (next) {
