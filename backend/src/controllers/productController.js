@@ -1,4 +1,5 @@
 const Product = require('../models/Products');
+const productService = require('../services/products/productService');
 
 
 //implementing the get products throught the Id param
@@ -108,9 +109,7 @@ const searchProducts = async (req, res) => {
         }
     }
     try{
-
-        const products = await Product.find(searchCriteria).sort({ createdAt: -1}).skip(skip).limit(limit);
-        const total = await Product.countDocuments(searchCriteria);
+        const { products, total } = await productService.searchProducts(searchCriteria, skip, limit);
         res.json({
             products,
             pagination: {
@@ -121,7 +120,7 @@ const searchProducts = async (req, res) => {
             }
         });
     }
-
+    
     catch(error){
         return res.status(500).json({
             message: 'Error Searching products by query',
