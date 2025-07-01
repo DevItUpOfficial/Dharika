@@ -1,4 +1,4 @@
-const Product = require('../models/Products');
+const Product = require('../models/Product');
 const productService = require('../services/products/productService');
 
 
@@ -12,7 +12,7 @@ const getProductById = async (req, res) => {
     }
 
     try{
-        const product = await Product.findOne({id: id});
+        const product = await Product.findOne({_id: id});
         if (!product){
             return res.status(404).json({
                 message: 'Product not found'
@@ -36,27 +36,18 @@ const getProductById = async (req, res) => {
 //implementing the get related products through the ID param // Added the pagination and limit 
 const getRelatedProducts = async (req, res) => {
     const { sku } = req.params;
-    const limit = parseInt(req.query.limit) || 10;
-    const page = parseInt(req.query.page) || 1;
-    const skip = (page - 1) * limit;
-
+    
     try{
-        const baseProduct = await Product.findOne({sku: sku, isActive: true});
-        if (!baseProduct){
+        const limit = parseInt(req.query.limit) || 10;
+        const page = parseInt(req.query.page) || 1;
+
+        const { products, total } = await productService.getProductsByCategory(sku, limit, page);
+
+        if (products.length === 0) {
             return res.status(404).json({
-                message: 'Base product not found'
+                message: 'No related products found'
             });
         }
-
-        const relatedCriteria  = {
-            categoryId: baseProduct.categoryId,
-            isActive: true,
-            sku: { $ne: sku}
-        };
-
-        const products = await Product.find(relatedCriteria).sort({ createdAt: -1 }).skip(skip).limit(limit);
-
-        const total = await Product.countDocuments(relatedCriteria);
 
         return res.status(200).json({
             message: 'Related products fetched successfully',
@@ -120,7 +111,7 @@ const searchProducts = async (req, res) => {
             }
         });
     }
-    
+
     catch(error){
         return res.status(500).json({
             message: 'Error Searching products by query',
@@ -167,6 +158,7 @@ const getFeaturedProducts = async (req, res) => {
         });
     }
 } 
+
 
 //exporting the functions 
 module.exports = {
