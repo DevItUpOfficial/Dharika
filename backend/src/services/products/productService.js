@@ -1,6 +1,7 @@
 const Product = require('../../models/Product');
 
-const searchProducts = async (searchCriteria, req, res) => {
+const searchProducts = async (searchCriteria, skip, limit) => {
+
     const products = await Product.find(searchCriteria)
         .sort({createdAt: -1})
         .skip(skip)
