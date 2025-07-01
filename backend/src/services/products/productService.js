@@ -1,5 +1,6 @@
 const Product = require('../../models/Product');
 
+// this function searches for products based on various criteria
 const searchProducts = async (searchCriteria, skip, limit) => {
 
     const products = await Product.find(searchCriteria)
@@ -22,7 +23,8 @@ const searchProducts = async (searchCriteria, skip, limit) => {
     return { products, total };
 };
 
-
+// This function fetches products by category based on the base SKU
+// It returns a paginated list of products that belong to the same category as the base product
 const getProductsByCategory = async (baseSku , limit= 10, page = 1) => {
     const skip = (page-1) * limit;
     
