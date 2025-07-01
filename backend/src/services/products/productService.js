@@ -8,6 +8,17 @@ const searchProducts = async (searchCriteria, skip, limit) => {
         .limit(limit)
 
     const total = await Product.countDocuments(searchCriteria);
+
+    if (products.length === 0){
+        return {
+            error: true,
+            status: 404,
+            products: [],
+            total: 0 | null,
+            message: 'No products found matching to the search criteria'
+        }
+    }
+
     return { products, total };
 };
 

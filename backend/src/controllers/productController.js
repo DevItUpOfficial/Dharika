@@ -101,15 +101,18 @@ const searchProducts = async (req, res) => {
     }
     try{
         const { products, total } = await productService.searchProducts(searchCriteria, skip, limit);
-        res.json({
-            products,
-            pagination: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit)
+        res.json(
+            {
+                products: products,
+                message: 'Products fetched successfully',
+                pagination: {
+                    total,
+                    page,
+                    limit,
+                    totalPages: Math.ceil(total / limit)
+                }
             }
-        });
+        )
     }
 
     catch(error){
