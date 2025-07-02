@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const wishlistController = require('../controllers/wishlistController');
 const requireAuth = require("../middleware/auth");
+const optionalAuth = require("../middleware/optionalAuth")
 
 // --- Wishlist Routes ---
 
@@ -20,8 +21,8 @@ router.delete('/wishlists/:id', requireAuth, wishlistController.deleteWishlist);
 // Share wishlist
 router.post('/wishlists/:id/share', requireAuth, wishlistController.shareWishlist);
 
-// Get a shared wishlist via token (no auth needed)
-router.get('/wishlists/shared/:token', wishlistController.getSharedWishlist);
+// Get a shared wishlist via token
+router.get('/wishlists/shared/:token', optionalAuth, wishlistController.getSharedWishlist);
 
 
 // --- Wishlist Item Routes ---

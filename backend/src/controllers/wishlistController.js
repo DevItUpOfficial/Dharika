@@ -9,7 +9,7 @@ const User = require('../models/User');
 // GET /api/wishlists/:userId
 const getWishlistsByUser = async (req, res) => {
   try {
-    const wishlists = await wishlistService.getByUser(req.user.userId, req.params.userId);
+    const wishlists = await wishlistService.getByUser(req.user, req.params.userId);
     res.json(wishlists);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -29,7 +29,7 @@ const createWishlist = async (req, res) => {
 // PUT /api/wishlists/:id
 const updateWishlist = async (req, res) => {
   try {
-    const updated = await wishlistService.update(req.params.id, req.body, req.user.userId);
+    const updated = await wishlistService.update(req.params.id, req.body, req.user);
     res.json(updated);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -39,7 +39,7 @@ const updateWishlist = async (req, res) => {
 // DELETE /api/wishlists/:id
 const deleteWishlist = async (req, res) => {
   try {
-    await wishlistService.remove(req.params.id, req.user.userId);
+    await wishlistService.remove(req.params.id, req.user);
     res.status(204).end();
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -49,7 +49,7 @@ const deleteWishlist = async (req, res) => {
 // POST /api/wishlists/:id/share
 const shareWishlist = async (req, res) => {
   try {
-    const shareData = await wishlistService.share(req.params.id);
+    const shareData = await wishlistService.share(req.params.id, req.user);
     res.json(shareData);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -59,7 +59,7 @@ const shareWishlist = async (req, res) => {
 // GET /api/wishlists/shared/:token
 const getSharedWishlist = async (req, res) => {
   try {
-    const sharedData = await wishlistService.getShared(req.params.token, req.user?.userId);
+    const sharedData = await wishlistService.getShared(req.params.token, req.user || null);
     res.json(sharedData);
   } catch (err) {
     res.status(404).json({ error: err.message });
@@ -72,7 +72,7 @@ const getSharedWishlist = async (req, res) => {
 // GET /api/wishlists/:wishlistId/items
 const getItems = async (req, res) => {
   try {
-    const items = await wishlistItemService.getByWishlist(req.params.wishlistId, req.user.userId);
+    const items = await wishlistItemService.getByWishlist(req.params.wishlistId, req.user);
     res.json(items);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -83,7 +83,7 @@ const getItems = async (req, res) => {
 const addItem = async (req, res) => {
   try {
     const { productId, userId } = req.body;
-    const item = await wishlistItemService.add(req.params.wishlistId, productId, req.user.userId);
+    const item = await wishlistItemService.add(req.params.wishlistId, productId, req.user);
     res.status(201).json(item);
   } catch (err) {
     res.status(400).json({ error: err.message });
@@ -93,7 +93,7 @@ const addItem = async (req, res) => {
 // DELETE /api/items/:itemId
 const removeItem = async (req, res) => {
   try {
-    await wishlistItemService.remove(req.params.itemId, req.user.userId);
+    await wishlistItemService.remove(req.params.itemId, req.user);
     res.status(204).end();
   } catch (err) {
     res.status(404).json({ error: err.message });
@@ -111,8 +111,7 @@ const addCollaborator = async (req, res) => {
       req.params.wishlistId,
       userId,
       canEdit,
-      req.user.userId,
-      req.user.role
+      req.user
     );
     res.status(201).json(collaborator);
   } catch (err) {
@@ -124,7 +123,7 @@ const addCollaborator = async (req, res) => {
 // DELETE /api/collaborators/:id
 const removeCollaborator = async (req, res) => {
   try {
-    await wishlistCollaboratorService.removeCollaborator(req.params.id, req.user.userId, req.user.role);
+    await wishlistCollaboratorService.removeCollaborator(req.params.id, req.user);
     res.status(204).end();
   } catch (err) {
     const status = err.message === 'Collaborator not found' ? 404 : 500;
@@ -139,8 +138,7 @@ const updateCollaboratorPermissions = async (req, res) => {
     const updated = await wishlistCollaboratorService.updatePermissions(
       req.params.id,
       canEdit,
-      req.user.userId,
-      req.user.role
+      req.user
     );
     res.json(updated);
   } catch (err) {
