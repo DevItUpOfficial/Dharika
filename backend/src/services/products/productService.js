@@ -63,7 +63,25 @@ const getProductsByCategory = async (baseSku , limit= 10, page = 1) => {
 }
 
 
+const getProducts = async (filters, limit = 10, page =1 ) => {
+    const skip = (page - 1) * limit;
+
+    const query = {
+        isActive: true,
+        ...filters,
+    };
+
+    const products = await Product.find(query)
+        .sort({createdAt: -1})
+        .skip(skip)
+        .limit(limit);
+
+    const total = await Product.countDocuments(query);
+    return { products, total };
+}
+
 module.exports = {
     searchProducts,
-    getProductsByCategory
+    getProductsByCategory,
+    getProducts
 }
