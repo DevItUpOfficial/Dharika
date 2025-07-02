@@ -14,7 +14,7 @@ const requireAuth = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (err) {
-    console.error("JWT Auth Error:", err);
+    // console.error("JWT Auth Error:", err);
     res.status(403).json({ error: "Invalid or expired token" });
   }
 };
