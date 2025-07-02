@@ -101,4 +101,8 @@ userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 userSchema.index({ role: 1 });
 
+<<<<<<< HEAD
 module.exports = mongoose.model("User", userSchema);
+=======
+module.exports = mongoose.model("User", userSchema);
+>>>>>>> feature/auth
