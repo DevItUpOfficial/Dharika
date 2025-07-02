@@ -4,7 +4,6 @@ const Wishlist = require("./Wishlist");
 const GameScore = require("./GameScore");
 const Order = require("./Order");
 
-
 const userSchema = new mongoose.Schema(
   {
     email: {
@@ -21,7 +20,6 @@ const userSchema = new mongoose.Schema(
 
     passwordHash: {
       type: String,
-     
     },
 
     provider: {
@@ -33,7 +31,7 @@ const userSchema = new mongoose.Schema(
     googleId: {
       type: String,
       unique: true,
-      sparse: true, 
+      sparse: true,
     },
 
     firstName: {
@@ -54,23 +52,20 @@ const userSchema = new mongoose.Schema(
       default: true,
     },
 
-
     role: {
       type: String,
       enum: ["customer", "admin", "vendor"],
       default: "customer",
     },
 
-
     gameScore: {
       type: Number,
       default: 0,
     },
 
-  
     lastLoginIP: {
       type: String,
-      select: false, 
+      select: false,
     },
     loginAttempts: {
       type: Number,
@@ -101,8 +96,4 @@ userSchema.index({ email: 1 }, { unique: true });
 userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 userSchema.index({ role: 1 });
 
-<<<<<<< HEAD
 module.exports = mongoose.model("User", userSchema);
-=======
-module.exports = mongoose.model("User", userSchema);
->>>>>>> feature/auth
