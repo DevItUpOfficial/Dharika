@@ -10,5 +10,6 @@ router.get('/', productController.getProducts);
 router.get('/search', productController.searchProducts);
 router.get('/featured', productController.getFeaturedProducts);
 router.get('/related/:sku', productController.getRelatedProducts);
+router.get('/productvariants/:id', productController.getProductVariant);
 router.get('/:id', productController.getProductById);
 module.exports = router;
