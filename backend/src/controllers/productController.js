@@ -5,34 +5,41 @@ const productService = require('../services/products/productService');
 
 // Implementing the get all products function
 const getProducts = async (req, res) => {
-  const limit = parseInt(req.query.limit) || 10;
-  const page = parseInt(req.query.page) || 1;
+  try {
+    const limit = parseInt(req.query.limit) || 10;
+    const page = parseInt(req.query.page) || 1;
 
-  const allProducts = await productService.getProducts(req, limit, page);
+    const allProducts = await productService.getProducts(req.query, limit, page);
 
-  if (products.error) {
-    return res.status(400).json({
-      message: products.message,
-    });
-  }
+    if (allProducts.error) {
+      return res.status(400).json({
+        message: allProducts.message,
+      });
+    }
 
-  if (products.length === 0) {
-    return res.status(404).json({
-      message: "No products found",
-    });
-  }
+    if (allProducts.products.length === 0) {
+      return res.status(404).json({
+        message: "No products found",
+      });
+    }
 
-  return res.status(200).json({
-    message: "Products fetched successfully",
-    products: allProducts.products,
-    total: allProducts.total,
-    pagination: {
+    return res.status(200).json({
+      message: "Products fetched successfully",
+      products: allProducts.products,
       total: allProducts.total,
-      page: page,
-      limit: limit,
-      totalPages: Math.ceil(allProducts.total / limit),
-    },
-  });
+      pagination: {
+        total: allProducts.total,
+        page: page,
+        limit: limit,
+        totalPages: Math.ceil(allProducts.total / limit),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error fetching products",
+      error: error.message,
+    });
+  }
 };
 
 //implementing the get products throught the Id param

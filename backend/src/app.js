@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const corsOptions = require('./config/corsOptions');
 
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
@@ -10,7 +11,7 @@ const wishlistRoutes = require('./routes/wishlist');
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors(corsOptions));
 app.use(express.json());
 
 // Routes
