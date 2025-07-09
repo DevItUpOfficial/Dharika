@@ -1,8 +1,9 @@
-const Product = require("../models/Product");
-const productService = require("../services/products/productService");
+const Product = require('../models/Product');
+const ProductVariant = require('../models/ProductVariant'); //product variant model
+const Category = require('../models/Category');// category model 
+const productService = require('../services/products/productService');
 
 // Implementing the get all products function
-
 const getProducts = async (req, res) => {
   const limit = parseInt(req.query.limit) || 10;
   const page = parseInt(req.query.page) || 1;
@@ -177,29 +178,49 @@ const getFeaturedProducts = async (req, res) => {
       });
     }
 
+// <<<<<<< feature/products
+// Adding the new function which will intract with the product variant and category models 
+
+const getProductVariant = async(req, res) => {
+    const { id } = req.params;
+    if (!id){
+        return res.status(400).json({
+            message: 'Product ID is required'
+        })
+    }
+
+    const { product, total } = await productService.getProductVariant(id);
+
+    if (product.error){
+        return res.status(product.status || 500).json({
+            message: product.message,
+        }
+        );
+    }
+
     return res.status(200).json({
-      message: "Featured products fetched successfully",
-      products: products,
-      pagination: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
-    });
-  } catch (error) {
-    return res.status(500).json({
-      message: "Error Fetching featured products",
-      error: error.message,
-    });
-  }
-};
+        message: 'Product variants fetched successfully',
+        product: product,
+        total: total,
+        pagination: {
+            total: total,
+            page: 1,
+            limit: product.length || 10,
+            totalPages: Math.ceil(total / (product.length || 10))
+        }
+    })
+}
+
+
+
+
 
 //exporting the functions
 module.exports = {
-  getProducts,
-  getProductById,
-  getRelatedProducts,
-  searchProducts,
-  getFeaturedProducts,
+    getProductById,
+    getRelatedProducts,
+    searchProducts,
+    getFeaturedProducts,
+    getProducts,
+    getProductVariant
 };
