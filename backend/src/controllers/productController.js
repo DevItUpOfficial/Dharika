@@ -162,8 +162,6 @@ const getFeaturedProducts = async (req, res) => {
   const page = parseInt(req.query.page) || 1;
   const skip = (page - 1) * limit;
 
-  const total = await Product.countDocuments({ isActive: true });
-
   try {
     const products = await Product.find({ isActive: true })
       .sort({ createdAt: -1 })
@@ -178,49 +176,67 @@ const getFeaturedProducts = async (req, res) => {
       });
     }
 
-// <<<<<<< feature/products
-// Adding the new function which will intract with the product variant and category models 
+    return res.status(200).json({
+      message: "Featured products fetched successfully",
+      products: products,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error fetching featured products",
+      error: error.message,
+    });
+  }
+};
 
-const getProductVariant = async(req, res) => {
-    const { id } = req.params;
-    if (!id){
-        return res.status(400).json({
-            message: 'Product ID is required'
-        })
-    }
+// Adding the new function which will interact with the product variant and category models 
+const getProductVariant = async (req, res) => {
+  const { id } = req.params;
+  if (!id) {
+    return res.status(400).json({
+      message: 'Product ID is required'
+    });
+  }
 
+  try {
     const { product, total } = await productService.getProductVariant(id);
 
-    if (product.error){
-        return res.status(product.status || 500).json({
-            message: product.message,
-        }
-        );
+    if (product.error) {
+      return res.status(product.status || 500).json({
+        message: product.message,
+      });
     }
 
     return res.status(200).json({
-        message: 'Product variants fetched successfully',
-        product: product,
+      message: 'Product variants fetched successfully',
+      product: product,
+      total: total,
+      pagination: {
         total: total,
-        pagination: {
-            total: total,
-            page: 1,
-            limit: product.length || 10,
-            totalPages: Math.ceil(total / (product.length || 10))
-        }
-    })
-}
-
-
-
-
+        page: 1,
+        limit: product.length || 10,
+        totalPages: Math.ceil(total / (product.length || 10))
+      }
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Error fetching product variants",
+      error: error.message,
+    });
+  }
+};
 
 //exporting the functions
 module.exports = {
-    getProductById,
-    getRelatedProducts,
-    searchProducts,
-    getFeaturedProducts,
-    getProducts,
-    getProductVariant
+  getProductById,
+  getRelatedProducts,
+  searchProducts,
+  getFeaturedProducts,
+  getProducts,
+  getProductVariant
 };
